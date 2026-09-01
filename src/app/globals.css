@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (Tailwind v4 syntax) - matches Finance's
+   documented convention exactly (class-based, not OS-preference-based),
+   and is required for next-themes (attribute="class") to have any
+   visible effect - toggling a class the CSS doesn't react to does
+   nothing, which is what the original @media-query-based version would
+   have silently done once ThemeContext was wired in. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
