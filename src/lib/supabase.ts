@@ -39,7 +39,7 @@ export const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
  * calling code was correct, but the client itself was never actually
  * using it.
  */
-export const coreDB = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const coreDB = createBrowserClient<Database, "core">(SUPABASE_URL, SUPABASE_ANON_KEY, {
   db: { schema: "core" },
   isSingleton: false,
 });
@@ -52,7 +52,7 @@ export const coreDB = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_
  *
  * isSingleton: false required - see coreDB's comment above.
  */
-export const workflowDB = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const workflowDB = createBrowserClient<Database, "workflow">(SUPABASE_URL, SUPABASE_ANON_KEY, {
   db: { schema: "workflow" },
   isSingleton: false,
 });
@@ -61,8 +61,24 @@ export const workflowDB = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_A
  * leave schema client - this module's own tables/RPCs.
  * isSingleton: false required - see coreDB's comment above.
  */
-export const leaveDB = createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const leaveDB = createBrowserClient<Database, "leave">(SUPABASE_URL, SUPABASE_ANON_KEY, {
   db: { schema: "leave" },
+  isSingleton: false,
+});
+
+/**
+ * attendance schema client - the Attendance Corrections module's own
+ * tables/RPCs. Same requirement as workflow/leave/core: "attendance"
+ * must be added under Project Settings -> API -> Exposed schemas in
+ * Supabase, then NOTIFY pgrst, 'reload schema'; in the SQL Editor -
+ * PostgREST 404s on anything in a non-exposed schema regardless of
+ * grants (the exact bug #2/#3 class already hit twice for
+ * workflow/core - don't skip this step for a third schema).
+ *
+ * isSingleton: false required - see coreDB's comment above.
+ */
+export const attendanceDB = createBrowserClient<Database, "attendance">(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  db: { schema: "attendance" },
   isSingleton: false,
 });
 
