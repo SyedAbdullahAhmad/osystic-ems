@@ -1,7 +1,14 @@
 "use client";
 // src/app/(auth)/login/page.tsx
+//
+// useSearchParams() requires a Suspense boundary for Next.js to
+// statically prerender this page - split into an inner component (the
+// actual page content) and a Suspense-wrapped default export. Pre-existing
+// gap, unrelated to the database.types.ts/supabase client fix - this
+// simply never surfaced before because the build never got past the
+// TypeScript phase until now.
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -9,7 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -65,5 +72,13 @@ export default function LoginPage() {
         </p>
       </div>
     </form>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -3,12 +3,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, LayoutDashboard, Wallet } from "lucide-react";
+import { CalendarDays, Clock, LayoutDashboard, Wallet } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/leave/requests", label: "Leave Requests", icon: CalendarDays },
   { href: "/dashboard/leave/balance", label: "Leave Balance", icon: Wallet },
+  { href: "/dashboard/attendance/corrections", label: "Attendance Corrections", icon: Clock },
 ];
 
 export function Sidebar() {
