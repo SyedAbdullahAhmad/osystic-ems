@@ -36,6 +36,8 @@ export type LedgerMovementType = "ACCRUAL" | "DEDUCTION" | "ADJUSTMENT" | "CARRY
 export type LeaveRequestStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "HALF_DAY" | "ON_LEAVE";
 export type AttendanceCorrectionRequestStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
+export type AssetStatus = "AVAILABLE" | "ASSIGNED" | "IN_REPAIR" | "RETIRED";
+export type AssetRequestStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED" | "FULFILLED";
 
 export interface Database {
   core: {
@@ -274,6 +276,144 @@ export interface Database {
           correction_request_id: string;
           attendance_day_id: string;
           workflow_request_id: string | null;
+          status: string;
+        };
+      };
+    };
+  };
+  assets: {
+    Tables: {
+      asset_categories: {
+        Row: {
+          id: string;
+          category_code: string;
+          category_name: string;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: Partial<Database["assets"]["Tables"]["asset_categories"]["Row"]>;
+        Update: Partial<Database["assets"]["Tables"]["asset_categories"]["Row"]>;
+        Relationships: [];
+      };
+      assets: {
+        Row: {
+          id: string;
+          asset_category_id: string;
+          asset_code: string;
+          asset_name: string;
+          serial_number: string | null;
+          current_status: AssetStatus;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: Partial<Database["assets"]["Tables"]["assets"]["Row"]>;
+        Update: Partial<Database["assets"]["Tables"]["assets"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "assets_asset_category_id_fkey";
+            columns: ["asset_category_id"];
+            isOneToOne: false;
+            referencedRelation: "asset_categories";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      asset_requests: {
+        Row: {
+          id: string;
+          employee_id: string;
+          asset_category_id: string;
+          justification: string;
+          request_status: AssetRequestStatus;
+          workflow_request_id: string | null;
+          submitted_at: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: Partial<Database["assets"]["Tables"]["asset_requests"]["Row"]>;
+        Update: Partial<Database["assets"]["Tables"]["asset_requests"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "asset_requests_asset_category_id_fkey";
+            columns: ["asset_category_id"];
+            isOneToOne: false;
+            referencedRelation: "asset_categories";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      asset_assignments: {
+        Row: {
+          id: string;
+          asset_request_id: string;
+          asset_id: string;
+          employee_id: string;
+          assigned_at: string;
+          assigned_by: string;
+          returned_at: string | null;
+          created_at: string;
+          version: number;
+        };
+        Insert: Partial<Database["assets"]["Tables"]["asset_assignments"]["Row"]>;
+        Update: Partial<Database["assets"]["Tables"]["asset_assignments"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "asset_assignments_asset_id_fkey";
+            columns: ["asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+    };
+    Views: {
+      v_asset_request_approvals: {
+        Row: {
+          asset_request_id: string;
+          employee_id: string;
+          from_status: string | null;
+          to_status: string;
+          changed_at: string;
+          reason: string | null;
+          actor_user_id: string | null;
+          action: string | null;
+          action_comments: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Functions: {
+      submit_asset_request: {
+        Args: {
+          p_asset_category_id: string;
+          p_justification: string;
+          p_idempotency_key?: string | null;
+        };
+        Returns: {
+          asset_request_id: string;
+          workflow_request_id: string | null;
+          status: string;
+        };
+      };
+      fulfill_asset_request: {
+        Args: {
+          p_asset_request_id: string;
+          p_asset_id: string;
+        };
+        Returns: {
+          assignment_id: string;
+          asset_id: string;
           status: string;
         };
       };

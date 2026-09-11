@@ -82,9 +82,26 @@ export const attendanceDB = createBrowserClient<Database, "attendance">(SUPABASE
   isSingleton: false,
 });
 
+/**
+ * assets schema client - the Assets module's own tables/RPCs. Same
+ * requirement as workflow/leave/core/attendance: "assets" must be added
+ * under Project Settings -> API -> Exposed schemas in Supabase, then
+ * NOTIFY pgrst, 'reload schema'; in the SQL Editor - PostgREST 404s on
+ * anything in a non-exposed schema regardless of grants (the exact
+ * bug #2/#3 class already hit for workflow/core, then attendance -
+ * don't skip this step for a fifth schema).
+ *
+ * isSingleton: false required - see coreDB's comment above.
+ */
+export const assetsDB = createBrowserClient<Database, "assets">(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  db: { schema: "assets" },
+  isSingleton: false,
+});
+
 // NOTE: you may see a "Multiple GoTrueClient instances detected"
 // warning in the browser console after this change. This is expected
 // and harmless in this architecture - only the default `supabase`
 // client above is actually used for session/auth state (via
-// AuthContext.tsx); coreDB/workflowDB/leaveDB exist purely to target a
-// different schema for data queries, not to independently manage auth.
+// AuthContext.tsx); coreDB/workflowDB/leaveDB/attendanceDB/assetsDB
+// exist purely to target a different schema for data queries, not to
+// independently manage auth.
