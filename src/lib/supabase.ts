@@ -98,10 +98,25 @@ export const assetsDB = createBrowserClient<Database, "assets">(SUPABASE_URL, SU
   isSingleton: false,
 });
 
+/**
+ * hr schema client - the Contracts module's own tables/RPCs (hr is the
+ * schema name in the DBML/migrations, even though the feature is
+ * referred to as "Contracts" throughout - deliberate choice, see
+ * 003_contracts_create_and_submit_request.sql's header). Same
+ * exposed-schemas requirement as every other client here - a sixth
+ * schema, don't skip the step.
+ *
+ * isSingleton: false required - see coreDB's comment above.
+ */
+export const contractsDB = createBrowserClient<Database, "hr">(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  db: { schema: "hr" },
+  isSingleton: false,
+});
+
 // NOTE: you may see a "Multiple GoTrueClient instances detected"
 // warning in the browser console after this change. This is expected
 // and harmless in this architecture - only the default `supabase`
 // client above is actually used for session/auth state (via
-// AuthContext.tsx); coreDB/workflowDB/leaveDB/attendanceDB/assetsDB
-// exist purely to target a different schema for data queries, not to
-// independently manage auth.
+// AuthContext.tsx); coreDB/workflowDB/leaveDB/attendanceDB/assetsDB/
+// contractsDB exist purely to target a different schema for data
+// queries, not to independently manage auth.

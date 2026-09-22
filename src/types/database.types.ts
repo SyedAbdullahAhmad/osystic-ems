@@ -38,6 +38,8 @@ export type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "HALF_DAY" | "ON_
 export type AttendanceCorrectionRequestStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type AssetStatus = "AVAILABLE" | "ASSIGNED" | "IN_REPAIR" | "RETIRED";
 export type AssetRequestStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED" | "FULFILLED";
+export type ContractType = "PERMANENT" | "FIXED_TERM" | "PROBATION" | "INTERNSHIP" | "CONTRACTOR";
+export type ContractStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "ACTIVE" | "EXPIRED" | "TERMINATED";
 
 export interface Database {
   core: {
@@ -414,6 +416,126 @@ export interface Database {
         Returns: {
           assignment_id: string;
           asset_id: string;
+          status: string;
+        };
+      };
+    };
+  };
+  hr: {
+    Tables: {
+      contracts: {
+        Row: {
+          id: string;
+          employee_id: string;
+          contract_number: string;
+          contract_type: ContractType;
+          current_version_id: string | null;
+          status: ContractStatus;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: Partial<Database["hr"]["Tables"]["contracts"]["Row"]>;
+        Update: Partial<Database["hr"]["Tables"]["contracts"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "contracts_current_version_id_fkey";
+            columns: ["current_version_id"];
+            isOneToOne: false;
+            referencedRelation: "contract_versions";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      contract_versions: {
+        Row: {
+          id: string;
+          contract_id: string;
+          version_no: number;
+          effective_from: string;
+          effective_to: string | null;
+          document_file_id: string | null;
+          notes: string | null;
+          created_at: string;
+          created_by: string | null;
+          version: number;
+        };
+        Insert: Partial<Database["hr"]["Tables"]["contract_versions"]["Row"]>;
+        Update: Partial<Database["hr"]["Tables"]["contract_versions"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "contract_versions_contract_id_fkey";
+            columns: ["contract_id"];
+            isOneToOne: false;
+            referencedRelation: "contracts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      contract_requests: {
+        Row: {
+          id: string;
+          contract_id: string;
+          contract_version_id: string;
+          workflow_request_id: string | null;
+          requested_by: string;
+          submitted_at: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: Partial<Database["hr"]["Tables"]["contract_requests"]["Row"]>;
+        Update: Partial<Database["hr"]["Tables"]["contract_requests"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "contract_requests_contract_id_fkey";
+            columns: ["contract_id"];
+            isOneToOne: false;
+            referencedRelation: "contracts";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+    };
+    Views: {
+      v_contract_approvals: {
+        Row: {
+          contract_id: string;
+          contract_request_id: string;
+          employee_id: string;
+          from_status: string | null;
+          to_status: string;
+          changed_at: string;
+          reason: string | null;
+          actor_user_id: string | null;
+          action: string | null;
+          action_comments: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Functions: {
+      create_contract: {
+        Args: {
+          p_employee_id: string;
+          p_contract_type: ContractType;
+          p_effective_from: string;
+          p_effective_to?: string | null;
+          p_document_file_id?: string | null;
+          p_notes?: string | null;
+          p_contract_number?: string | null;
+          p_idempotency_key?: string | null;
+        };
+        Returns: {
+          contract_id: string;
+          contract_version_id: string;
+          contract_request_id: string;
+          contract_number: string;
+          workflow_request_id: string | null;
           status: string;
         };
       };
