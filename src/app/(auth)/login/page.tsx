@@ -12,7 +12,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase, coreDB } from "@/lib/supabase";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
@@ -35,7 +35,14 @@ function LoginForm() {
       toast.error(error.message);
       return;
     }
-
+    // Link this login to its person record (creates one for a brand-new
+    // user, or links an HR-created CANDIDATE person by confirmed email).
+    // Idempotent: safe on every login. A failure must not block login.
+    const { error: provisionError } = await coreDB.rpc("provision_person_for_user");
+    if (provisionError) {
+      console.error("provision_person_for_user failed:", provisionError.message);
+      toast.error("Signed in, but your profile could not be linked: " + provisionError.message);
+    }
     const redirectTo = searchParams.get("redirectedFrom") || "/dashboard";
     router.push(redirectTo);
     router.refresh();

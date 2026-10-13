@@ -115,6 +115,10 @@ export interface Database {
         Args: { p_user_id: string; p_permission_code: string };
         Returns: boolean;
       };
+      provision_person_for_user: {
+        Args: Record<string, never>;
+        Returns: { person_id: string; action_taken: string }[];
+      };
     };
   };
   leave: {
