@@ -40,10 +40,34 @@ export type AssetStatus = "AVAILABLE" | "ASSIGNED" | "IN_REPAIR" | "RETIRED";
 export type AssetRequestStatus = "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED" | "FULFILLED";
 export type ContractType = "PERMANENT" | "FIXED_TERM" | "PROBATION" | "INTERNSHIP" | "CONTRACTOR";
 export type ContractStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "ACTIVE" | "EXPIRED" | "TERMINATED";
+export type OnboardingStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "WITHDRAWN" | "HIRED";
 
 export interface Database {
   core: {
     Tables: {
+      // Added for Onboarding (read-only use: candidate name/email, department
+      // dropdown). Column lists cover only what the frontend selects - extend
+      // or regenerate with `supabase gen types` when convenient.
+      people: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          primary_email: string | null;
+          person_type: string;
+        };
+        Insert: Partial<Database["core"]["Tables"]["people"]["Row"]>;
+        Update: Partial<Database["core"]["Tables"]["people"]["Row"]>;
+        Relationships: [];
+      };
+      departments: {
+        Row: {
+          id: string;
+          name: string;
+        };
+        Insert: Partial<Database["core"]["Tables"]["departments"]["Row"]>;
+        Update: Partial<Database["core"]["Tables"]["departments"]["Row"]>;
+        Relationships: [];
+      };
       permissions: {
         Row: {
           id: string;
@@ -537,6 +561,83 @@ export interface Database {
           contract_number: string;
           workflow_request_id: string | null;
           status: string;
+        };
+      };
+    };
+  };
+  onboarding: {
+    Tables: {
+      onboarding_records: {
+        Row: {
+          id: string;
+          person_id: string;
+          position_title: string | null;
+          department_id: string | null;
+          proposed_start_date: string | null;
+          status: OnboardingStatus;
+          workflow_request_id: string | null;
+          submitted_at: string | null;
+          hired_at: string | null;
+          hired_by: string | null;
+          withdrawn_at: string | null;
+          withdrawn_by: string | null;
+          withdrawal_reason: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: Partial<Database["onboarding"]["Tables"]["onboarding_records"]["Row"]>;
+        Update: Partial<Database["onboarding"]["Tables"]["onboarding_records"]["Row"]>;
+        Relationships: [];
+      };
+    };
+    Views: {};
+    Functions: {
+      create_and_submit_onboarding_request: {
+        Args: {
+          p_full_name: string;
+          p_email: string;
+          p_idempotency_key: string;
+          p_position_title?: string | null;
+          p_department_id?: string | null;
+          p_proposed_start_date?: string | null;
+        };
+        Returns: {
+          onboarding_record_id: string;
+          person_id: string;
+          workflow_request_id: string | null;
+          onboarding_status: string;
+          workflow_status: string;
+          idempotent_replay: boolean;
+        };
+      };
+      confirm_employee_hire: {
+        Args: {
+          p_onboarding_record_id: string;
+          p_employee_number?: string | null;
+          p_hire_date?: string | null;
+        };
+        Returns: {
+          onboarding_record_id: string;
+          person_id: string;
+          hr_employee_id: string;
+          employee_linked: boolean;
+          idempotent_replay: boolean;
+          status: string;
+        };
+      };
+      withdraw_onboarding_request: {
+        Args: {
+          p_onboarding_record_id: string;
+          p_reason?: string | null;
+        };
+        Returns: {
+          onboarding_record_id: string;
+          status: string;
+          idempotent_replay: boolean;
+          workflow_cancelled: boolean;
         };
       };
     };

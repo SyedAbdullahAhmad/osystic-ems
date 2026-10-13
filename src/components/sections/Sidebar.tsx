@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Clock, FileText, LayoutDashboard, Package, Wallet } from "lucide-react";
+import { CalendarDays, Clock, FileText, LayoutDashboard, Package, UserPlus, Wallet } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/dashboard/attendance/corrections", label: "Attendance Corrections", icon: Clock },
   { href: "/dashboard/assets/requests", label: "Asset Requests", icon: Package },
   { href: "/dashboard/contracts", label: "Contracts", icon: FileText },
+  { href: "/dashboard/onboarding", label: "Onboarding", icon: UserPlus },
 ];
 
 export function Sidebar() {

@@ -113,6 +113,21 @@ export const contractsDB = createBrowserClient<Database, "hr">(SUPABASE_URL, SUP
   isSingleton: false,
 });
 
+/**
+ * onboarding schema client - the Onboarding module's own tables/RPCs.
+ * Same exposed-schemas requirement as every other client here: "onboarding"
+ * must be added under Project Settings -> API -> Exposed schemas in
+ * Supabase, then NOTIFY pgrst, 'reload schema'; in the SQL Editor -
+ * PostgREST 404s on anything in a non-exposed schema regardless of grants
+ * (a seventh schema, don't skip the step).
+ *
+ * isSingleton: false required - see coreDB's comment above.
+ */
+export const onboardingDB = createBrowserClient<Database, "onboarding">(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  db: { schema: "onboarding" },
+  isSingleton: false,
+});
+
 // NOTE: you may see a "Multiple GoTrueClient instances detected"
 // warning in the browser console after this change. This is expected
 // and harmless in this architecture - only the default `supabase`
