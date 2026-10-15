@@ -632,6 +632,16 @@ export interface Database {
           status: string;
         };
       };
+
+      get_candidate_identities: {
+        Args: { p_onboarding_record_ids?: string[] | null };
+        Returns: {
+          onboarding_record_id: string;
+          person_id: string;
+          full_name: string | null;
+          email: string | null;
+        }[];
+      };
       withdraw_onboarding_request: {
         Args: {
           p_onboarding_record_id: string;

@@ -20,12 +20,14 @@ import type {
   OnboardingHistoryEntry,
 } from "@/types/onboarding.types";
 
-function mapRecord(row: any, person?: { full_name: string | null; primary_email: string | null }): OnboardingRecord {
+type CandidateIdentity = { full_name: string | null; email: string | null };
+
+function mapRecord(row: any, identity?: CandidateIdentity): OnboardingRecord {
   return {
     id: row.id,
     personId: row.person_id,
-    candidateName: person?.full_name ?? null,
-    candidateEmail: person?.primary_email ?? null,
+    candidateName: identity?.full_name ?? null,
+    candidateEmail: identity?.email ?? null,
     positionTitle: row.position_title,
     departmentId: row.department_id,
     proposedStartDate: row.proposed_start_date,
@@ -41,16 +43,23 @@ function mapRecord(row: any, person?: { full_name: string | null; primary_email:
   };
 }
 
-// Best effort: core.people may not be readable for every viewer. A failure
-// here must never break the page - the UI falls back to a short id.
-async function fetchPeopleByIds(ids: string[]) {
-  const map = new Map<string, { full_name: string | null; primary_email: string | null }>();
-  if (ids.length === 0) return map;
+// Candidate name/email come from onboarding.get_candidate_identities() (migration 008):
+// a read-only function that returns identity ONLY for onboarding records the caller can
+// already see (ONBOARDING_MANAGE, ONBOARDING_VIEW_ALL, or the linked candidate). The UI
+// never reads core.people directly. Best effort: if the function is missing or errors,
+// the page still loads and falls back to "Candidate <short id>".
+async function fetchIdentitiesByRecordId(recordIds: string[] | null) {
+  const map = new Map<string, CandidateIdentity>();
+  if (recordIds !== null && recordIds.length === 0) return map;
 
-  const { data, error } = await coreDB.from("people").select("id, full_name, primary_email").in("id", ids);
+  const { data, error } = await onboardingDB.rpc("get_candidate_identities", {
+    p_onboarding_record_ids: recordIds,
+  });
   if (error || !data) return map;
 
-  for (const p of data as any[]) map.set(p.id, { full_name: p.full_name, primary_email: p.primary_email });
+  for (const row of data as any[]) {
+    map.set(row.onboarding_record_id, { full_name: row.full_name, email: row.email });
+  }
   return map;
 }
 
@@ -63,8 +72,8 @@ export async function fetchOnboardingRecords(): Promise<OnboardingRecord[]> {
   if (error) throw new Error(`Failed to load onboarding records: ${error.message}`);
 
   const rows = (data ?? []) as any[];
-  const people = await fetchPeopleByIds(Array.from(new Set(rows.map((r) => r.person_id))));
-  return rows.map((row) => mapRecord(row, people.get(row.person_id)));
+  const identities = await fetchIdentitiesByRecordId(rows.map((r) => r.id));
+  return rows.map((row) => mapRecord(row, identities.get(row.id)));
 }
 
 export async function fetchOnboardingRecordById(id: string): Promise<OnboardingRecord | null> {
@@ -73,8 +82,8 @@ export async function fetchOnboardingRecordById(id: string): Promise<OnboardingR
   if (error) throw new Error(`Failed to load onboarding record: ${error.message}`);
   if (!data) return null;
 
-  const people = await fetchPeopleByIds([(data as any).person_id]);
-  return mapRecord(data, people.get((data as any).person_id));
+  const identities = await fetchIdentitiesByRecordId([(data as any).id]);
+  return mapRecord(data, identities.get((data as any).id));
 }
 
 // Best effort too. Reads workflow.status_history directly (no onboarding
