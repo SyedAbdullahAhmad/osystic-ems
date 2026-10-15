@@ -53,7 +53,7 @@
 -- recorded in workflow."_seed_provenance" are deleted - never "everything
 -- matching module/code".
 --
--- Canonical rollback order: 007, 006, 004 (this file), 005, 003, 002,
+-- Canonical rollback order: 008, 007, 006, 004 (this file), 005, 003, 002,
 -- 001. This file must run BEFORE 005 (005 removes the
 -- ONBOARDING_MANAGE permission row that seeded data still references).
 -- ========================================================================

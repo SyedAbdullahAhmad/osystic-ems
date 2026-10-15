@@ -1238,19 +1238,19 @@ $$;
 -- TRACK A - Migration Reversibility Evidence (fresh scratch DB/branch;
 --   never shared UAT or production):
 --     1. Clean pre-apply snapshot (checklist Step 1).
---     2. Apply 001-007.
+--     2. Apply 001-008.
 --     3. DO NOT call onboarding.seed_onboarding_workflow_definition().
 --     4. DO NOT run this test file. Create no onboarding data.
---     5. Run rollbacks: 007 -> 006 -> 004 -> 005 -> 003 -> 002 -> 001.
+--     5. Run rollbacks: 008 -> 007 -> 006 -> 004 -> 005 -> 003 -> 002 -> 001.
 --        (004's rollback prints the CASE 1 notice and drops only the
 --        seed function.)
 --     6. Verify exact pre-Phase-8 state: pg_namespace has no
 --        'onboarding'; Step 1 snapshot matches, including
 --        workflow._seed_provenance.
---     7. Re-apply 001-007 and confirm it succeeds (repeatability).
+--     7. Re-apply 001-008 and confirm it succeeds (repeatability).
 --
 -- TRACK B - Functional Execution Evidence (the seeded scratch DB):
---     1. 001-007 applied, workflow seeded (checklist Steps 1-4).
+--     1. 001-008 applied, workflow seeded (checklist Steps 1-4).
 --     2. Run THIS file in full.
 --     3. Run the two-session concurrency test (checklist Step 5a).
 --     4. Run Leave/Attendance/Assets/Contracts regressions (Step 6).

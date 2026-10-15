@@ -102,3 +102,34 @@ generates a fresh `employee_number` per run. The other hard-coded
 employee numbers (`EMP-999-CONFLICT`, `EMP-SHOULD-BE-REJECTED`,
 `EMP-SHOULD-NOT-EXIST`) are only used in calls/inserts that are expected
 to be rejected, so they never persist.
+
+---
+
+## Round 8: migration 008 (candidate identity projection)
+
+Team-lead decision after the UI test showed approvers without
+`PEOPLE_MANAGE` seeing "Candidate d843d6ef": Option A, implemented as an
+onboarding-owned read-only function. No change to `core.people` RLS/grants
+and no change to `001`-`007`.
+
+- `008_onboarding_candidate_identity_projection.sql`: `onboarding.get_candidate_identities(uuid[] DEFAULT NULL)`
+  returns `onboarding_record_id, person_id, full_name, email` only. SECURITY
+  DEFINER, actor from `auth.uid()`, pinned `search_path`, PUBLIC revoked,
+  EXECUTE for `authenticated` only, STABLE, no write statement. Visibility
+  is the same permission-based rule as the `onboarding_records_select`
+  policy (MANAGE, VIEW_ALL, or the ACTIVE-linked candidate); no role-name
+  bypass, so Technical Admin gets nothing by being Technical Admin.
+- `008_..._ROLLBACK.sql`: drops the function; first in the rollback order.
+- `TEST_onboarding_008_identity_projection.sql`: MANAGE with and without
+  PEOPLE_MANAGE sees the real name/email; VIEW_ALL holder (temporary role)
+  sees it; unrelated user and an admin-ish user with no onboarding
+  permission get zero rows; candidate gets only their own record; direct
+  `core.people` SELECT stays blocked for the MANAGE and VIEW_ALL users;
+  function shape/grants checks; no-write fingerprint; unauthenticated call
+  rejected; Leave/Attendance/Assets/Contracts counts unchanged; temporary
+  roles removed by id; final zero-failure gate.
+- Frontend: `onboarding.service.ts` resolves names through this function
+  instead of reading `core.people` directly.
+- Checklist: Track A is now `001`-`008`, rollback `008 -> 007 -> 006 -> 004 -> 005 -> 003 -> 002 -> 001`.
+
+Not yet run against a database.

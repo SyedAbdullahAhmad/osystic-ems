@@ -1,4 +1,4 @@
-# Onboarding Module — Apply Checklist  (v8 — corrected per Shawaiz's round-7 decision)
+# Onboarding Module — Apply Checklist  (v8 + migration 008 — per Shawaiz's round-7 and round-8 decisions)
 
 Same discipline as every prior module: backup → pre-apply snapshot →
 apply one file at a time → post-apply regression check → bootstrap →
@@ -12,6 +12,20 @@ re-opens the architecture. Note: item NUMBERS reset each round (they
 follow Arslan's own numbered list in each review) — "item 1" means a
 different thing in different rounds. Headings below are always suffixed
 with the round to avoid ambiguity.
+
+## ROUND 8 ADDITION: migration 008 (candidate identity projection)
+
+Approved by the team lead (Option A): `onboarding.get_candidate_identities(uuid[])`,
+a read-only SECURITY DEFINER function returning only
+`onboarding_record_id, person_id, full_name, email` for onboarding records
+the caller can already see (same rule as the `onboarding_records_select`
+policy: ONBOARDING_MANAGE, ONBOARDING_VIEW_ALL, or the linked candidate).
+`core.people` RLS and grants are unchanged. Apply it after `007`; its
+rollback is the FIRST file in the rollback order; Track A therefore
+becomes: apply `001`–`008`, no seed, roll back `008 → 007 → 006 → 004 → 005
+→ 003 → 002 → 001`, verify exact state, re-apply. Track B adds
+`TEST_onboarding_008_identity_projection.sql` (run after the main suite;
+needs the candidate account linked).
 
 ## CHANGES IN THIS REVISION (round 7 — Shawaiz's Option 1 decision)
 
@@ -208,6 +222,7 @@ Save this — `core.permissions` should be **+2** after `005`,
 5. `005_onboarding_permissions_seed.sql`
 6. `006_confirm_employee_hire.sql`
 7. `007_withdraw_onboarding_request.sql`
+8. `008_onboarding_candidate_identity_projection.sql` (round 8 - read-only candidate identity function; run `TEST_onboarding_008_identity_projection.sql` after it in the Track B database)
 
 Stop and report if any file errors.
 
@@ -488,11 +503,11 @@ Fresh disposable scratch database / Supabase branch. **Never shared UAT
 or production.** If none is available, say so before doing anything else.
 
 1. Take a clean pre-apply snapshot (Step 1 query). Save it.
-2. Apply `001`–`007` (Step 0 pgcrypto check first).
+2. Apply `001`–`008` (Step 0 pgcrypto check first).
 3. **Do NOT call `onboarding.seed_onboarding_workflow_definition()`.**
 4. **Do NOT run `TEST_onboarding_full_flow.sql`; create no onboarding data.**
 5. Run rollbacks in this exact order:
-   `007 → 006 → 004 → 005 → 003 → 002 → 001`.
+   `008 → 007 → 006 → 004 → 005 → 003 → 002 → 001`.
    `004`'s rollback should print the CASE 1 notice (no provenance rows)
    and drop only the seed function.
 6. Verify exact pre-Phase-8 state:
@@ -501,12 +516,12 @@ or production.** If none is available, say so before doing anything else.
    ```
    returns zero rows, and the Step 1 snapshot is identical to the saved
    one (including `workflow._seed_provenance` and `core.permissions`).
-7. Re-apply `001`–`007`; confirm success (repeatability).
+7. Re-apply `001`–`008`; confirm success (repeatability).
 
 ### TRACK B — Functional Execution Evidence
 The seeded scratch database (this can be the current one, see Step 7a).
 
-1. `001`–`007` applied; three test accounts verified (Step 3); workflow
+1. `001`–`008` applied; three test accounts verified (Step 3); workflow
    seeded (Step 4).
 2. Run `TEST_onboarding_full_flow.sql` in full (Step 5).
 3. Run the two-session concurrency test (Step 5a).
@@ -550,7 +565,7 @@ Keep the two proofs in separate sections.
 
 **Section 1 — Migration Reversibility Evidence (Track A):** environment
 description (fresh scratch, no seed invocation), pre-apply snapshot,
-apply results `001`–`007`, rollback results in order (include the `004`
+apply results `001`–`008`, rollback results in order (include the `004`
 CASE 1 notice), exact-state verification output, re-apply results.
 
 **Section 2 — Functional Execution Evidence (Track B):** seeded
