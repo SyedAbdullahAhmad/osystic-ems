@@ -219,6 +219,18 @@ BEGIN
     v_request_id := (v_result->>'approval_request_id')::uuid;
     SELECT "id" INTO v_step_id FROM "workflow"."approval_steps" WHERE "approval_request_id" = v_request_id AND "step_no" = 1;
 
+    -- Re-run guard (P05 review): this suite's fixture step is fixed and
+    -- start_approval_request() replays idempotently, so on a re-run the same
+    -- step comes back and escalation level 1 already exists
+    -- (sla_escalations_step_level_unique). The escalation lifecycle was proven
+    -- in the first run; same "skipped - already verified" convention as the
+    -- other one-way suites in this file.
+    IF EXISTS (SELECT 1 FROM "workflow"."sla_escalations" WHERE "approval_step_id" = v_step_id AND "escalation_level" = 1) THEN
+        PERFORM "workflow"."_test_assert"(v_suite, 'skipped - already verified in a prior run', true,
+            'sla_escalations level 1 already exists for this suite''s fixed fixture step; escalation behaviour was exercised in an earlier run.');
+        RETURN;
+    END IF;
+
     INSERT INTO "workflow"."sla_escalations" (id, approval_step_id, escalation_level, status, due_at, escalated_to_user_id, escalated_at)
     VALUES (gen_random_uuid(), v_step_id, 1, 'PENDING', now() + interval '1 day', v_target, now())
     RETURNING "id" INTO v_escalation_id;
@@ -362,10 +374,39 @@ $$;
 
 
 -- ========================================================================
--- Report
+-- Report, then clean up the test harness (P05 review, lead decision 3)
 -- ========================================================================
-SELECT * FROM "workflow"."_test_summary"();
-SELECT * FROM "workflow"."_test_failures"();
+-- The report is copied into a session-local TEMP table first, so it is still
+-- shown after the persistent harness has been dropped.
+DROP TABLE IF EXISTS "_wf_test_report";
+CREATE TEMP TABLE "_wf_test_report" AS
+    SELECT 'summary'::text AS "kind", "suite", "passed"::text AS "col_a", "failed"::text AS "col_b", "total"::text AS "col_c"
+    FROM "workflow"."_test_summary"()
+    UNION ALL
+    SELECT 'FAILURE', "suite", "test_name", "detail", NULL
+    FROM "workflow"."_test_failures"();
+
+-- All green  -> drop the results table and the test helper functions
+--               (007 recreates them on the next run).
+-- Any failure -> keep them so the failing rows can be inspected, and say so.
+DO $$
+DECLARE v_fail int;
+BEGIN
+    SELECT count(*) INTO v_fail FROM "_wf_test_report" WHERE "kind" = 'FAILURE';
+    IF v_fail = 0 THEN
+        DROP TABLE IF EXISTS "workflow"."_test_results" CASCADE;
+        DROP FUNCTION IF EXISTS "workflow"."_test_summary"();
+        DROP FUNCTION IF EXISTS "workflow"."_test_failures"();
+        DROP FUNCTION IF EXISTS "workflow"."_test_assert_raises"(text, text, text, text);
+        DROP FUNCTION IF EXISTS "workflow"."_test_assert"(text, text, boolean, text);
+        RAISE NOTICE 'workflow tests: all green; test results table and helper functions dropped';
+    ELSE
+        RAISE WARNING 'workflow tests: % FAILURE(S); harness kept for inspection (re-running 007 recreates it)', v_fail;
+    END IF;
+END;
+$$;
+
+SELECT * FROM "_wf_test_report" ORDER BY "kind" DESC, "suite", "col_a";
 
 -- ========================================================================
 -- END 008_workflow_rls_tests.sql

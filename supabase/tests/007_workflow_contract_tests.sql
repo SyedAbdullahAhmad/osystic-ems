@@ -30,7 +30,12 @@
 -- ------------------------------------------------------------------------
 -- Test harness (shared by 007 and 008)
 -- ------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS "workflow"."_test_results" (
+-- P05 review (lead decision 3): this is a TEST ARTEFACT, not production state.
+-- Any stale table from a previous run is dropped here and a fresh one created.
+-- 008 reports and then DROPS it (and the helper functions below) when the
+-- whole run is green. The table is never left with an authenticated grant.
+DROP TABLE IF EXISTS "workflow"."_test_results" CASCADE;
+CREATE TABLE "workflow"."_test_results" (
     "id" bigserial PRIMARY KEY,
     "suite" text NOT NULL,
     "test_name" text NOT NULL,
@@ -40,35 +45,20 @@ CREATE TABLE IF NOT EXISTS "workflow"."_test_results" (
 );
 
 -- Several suites (in both 007 and 008) deliberately SET LOCAL ROLE
--- "authenticated" mid-block to test RLS/grant boundaries from that
--- role's own perspective, then call _test_assert() while still under
--- that role to record the result. _test_assert() is a plain function
--- (not SECURITY DEFINER), so its own INSERT runs as whatever role is
--- currently active - without this, that INSERT fails with
--- "permission denied for table _test_results" the moment any test
--- tries to record its own outcome while impersonating authenticated.
--- This is pure test-harness plumbing (not a real production grant);
--- scoped to only what _test_assert()/_test_assert_raises() actually
--- do (a single INSERT each, per their bodies below - no UPDATE/DELETE
--- needed).
-GRANT INSERT ON "workflow"."_test_results" TO "authenticated";
-GRANT USAGE ON SEQUENCE "workflow"."_test_results_id_seq" TO "authenticated";
-
--- Every _test_assert() call is a plain INSERT with no de-dup, and
--- neither _test_summary() nor _test_failures() filters by run_at - so
--- without this, results accumulate FOREVER across every run this file
--- has ever been pasted, and a test that was fixed and now passes can
--- still show up as a failure via its own stale row from an old run
--- (this is exactly what happened: a test name that no longer even
--- exists in this file's current code still appeared as a failure).
--- Truncate here, once, at the top of 007 (which always runs first) -
--- 008 deliberately does NOT truncate, so its own results land
--- alongside 007's for one combined summary, per its header comment.
-TRUNCATE TABLE "workflow"."_test_results";
+-- "authenticated" mid-block to test RLS/grant boundaries from that role's own
+-- perspective, then call _test_assert() while still under that role.
+-- P05 review: instead of GRANTing INSERT on the results table (and USAGE on its
+-- sequence) to "authenticated" - which left a write grant behind every time this
+-- file ran - _test_assert() is now SECURITY DEFINER (empty search_path, fully
+-- schema-qualified body), so its single INSERT runs as the owner and
+-- "authenticated" needs NO privilege on the results table at all.
+-- _test_assert_raises() deliberately stays SECURITY INVOKER: it must EXECUTE the
+-- tested SQL as the impersonated role so RLS/grant tests mean what they say.
+-- (No TRUNCATE needed: the table above is created fresh on every run.)
 
 CREATE OR REPLACE FUNCTION "workflow"."_test_assert"(
     "p_suite" text, "p_test_name" text, "p_condition" boolean, "p_detail" text DEFAULT NULL
-) RETURNS void LANGUAGE plpgsql AS $$
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
     INSERT INTO "workflow"."_test_results" ("suite", "test_name", "passed", "detail")
     VALUES (p_suite, p_test_name, p_condition, p_detail);
@@ -111,6 +101,18 @@ RETURNS TABLE ("suite" text, "test_name" text, "detail" text)
 LANGUAGE sql AS $$
     SELECT "suite", "test_name", "detail" FROM "workflow"."_test_results" WHERE NOT "passed" ORDER BY "suite", "test_name";
 $$;
+
+-- Helper-function privileges (P05 review). The helpers are test-only but the
+-- results harness is intentionally retained when a run fails, so nothing here
+-- may stay executable by PUBLIC/anon. Only the role the suites impersonate
+-- ("authenticated") needs the two assertion helpers; the report helpers are
+-- called by the session owner only.
+REVOKE ALL ON FUNCTION "workflow"."_test_assert"(text, text, boolean, text)          FROM PUBLIC, "anon";
+REVOKE ALL ON FUNCTION "workflow"."_test_assert_raises"(text, text, text, text)      FROM PUBLIC, "anon";
+REVOKE ALL ON FUNCTION "workflow"."_test_summary"()                                  FROM PUBLIC, "anon", "authenticated";
+REVOKE ALL ON FUNCTION "workflow"."_test_failures"()                                 FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "workflow"."_test_assert"(text, text, boolean, text)       TO "authenticated";
+GRANT EXECUTE ON FUNCTION "workflow"."_test_assert_raises"(text, text, text, text)   TO "authenticated";
 
 
 -- ------------------------------------------------------------------------
