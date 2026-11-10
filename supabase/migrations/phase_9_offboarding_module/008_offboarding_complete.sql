@@ -8,8 +8,8 @@
 --   * exactly the five clearance domains, each final: ASSETS = CLEARED only; ACCESS/FINANCE/HANDOVER/HR = CLEARED or WAIVED
 --   * zero unreturned asset assignments is re-verified independently
 --   * BLOCKS on employee-scoped open items only (never cancels another module's records):
---       leave requests DRAFT/SUBMITTED; attendance correction requests SUBMITTED; asset requests SUBMITTED/APPROVED;
---       contracts PENDING_APPROVAL.  Returned as a structured list [{type, record_id, status}].
+--       leave requests DRAFT/SUBMITTED; APPROVED leave that extends beyond the last working date; attendance correction
+--       requests SUBMITTED; asset requests SUBMITTED/APPROVED; contracts PENDING_APPROVAL.  Returned as a structured list [{type, record_id, status}].
 --   * terminates EVERY ACTIVE contract of the employee (hr.terminate_contract) and then the employee (hr.terminate_employee),
 --     both with effective date = last_working_date. Any failure rolls the whole completion back. No ACTIVE contract does not block.
 --   * writes two immutable outbox events carrying the standard envelope (no termination reason, ever):
@@ -57,6 +57,14 @@ AS $$
         UNION ALL
         SELECT jsonb_build_object('type', 'CONTRACT_APPROVAL', 'record_id', c."id", 'status', c."status")
           FROM "hr"."contracts" c WHERE c."hr_employee_id" = p_hr_employee_id AND c."status" = 'PENDING_APPROVAL'
+        UNION ALL
+        -- APPROVED leave that runs PAST the last working date of the employee's open case (leave entirely on/before it does not block)
+        SELECT jsonb_build_object('type', 'APPROVED_LEAVE_BEYOND_LAST_WORKING_DATE', 'record_id', r."id", 'status', r."request_status")
+          FROM "leave"."leave_requests" r
+         WHERE r."hr_employee_id" = p_hr_employee_id AND r."request_status" = 'APPROVED'
+           AND r."end_date" > (SELECT oc."last_working_date" FROM "offboarding"."cases" oc
+                                WHERE oc."hr_employee_id" = p_hr_employee_id AND oc."status" IN ('SUBMITTED', 'APPROVED', 'IN_CLEARANCE')
+                                ORDER BY oc."created_at" DESC LIMIT 1)
     ) x;
 $$;
 

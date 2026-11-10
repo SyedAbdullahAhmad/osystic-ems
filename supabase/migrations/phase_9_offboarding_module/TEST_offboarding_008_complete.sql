@@ -75,14 +75,14 @@ DECLARE
     v_acc uuid := '00000000-0000-0000-0000-0000000000a9';
     v_c_good uuid := '00000000-0000-0000-0000-00000000c001';
     v_c_bad  uuid := '00000000-0000-0000-0000-00000000c002';
-    v_emp1 uuid; v_emp2 uuid; v_emp3 uuid; v_emp4 uuid; v_emp5 uuid; v_emp6 uuid; v_emp7 uuid; v_emp8 uuid; v_emp9 uuid;
-    c_self uuid; c_main uuid; c_block uuid; c_early uuid; c_incomp uuid; c_asset uuid; c_res uuid; c_atomic uuid; c_appr uuid;
+    v_emp1 uuid; v_emp2 uuid; v_emp3 uuid; v_emp4 uuid; v_emp5 uuid; v_emp6 uuid; v_emp7 uuid; v_emp8 uuid; v_emp9 uuid; v_emp10 uuid;
+    c_self uuid; c_main uuid; c_block uuid; c_early uuid; c_incomp uuid; c_asset uuid; c_res uuid; c_atomic uuid; c_appr uuid; c_leave uuid;
     v_r jsonb; v_r2 jsonb; v_s text; v_n int; v_n2 int; v_n3 int; v_err text; v_det text; v_cv int; v_hist int;
     v_sig text; v_oid oid; v_k text := 'off008k-' || substr(md5(random()::text), 1, 6) || '-';
     v_today date := current_date;
     t_lv_emp uuid; t_lv_type uuid; t_c_emp uuid; t_c_day uuid; t_a_emp uuid; t_a_cat uuid;
     v_lv uuid := gen_random_uuid(); v_co uuid := gen_random_uuid(); v_ar uuid := gen_random_uuid(); v_ct uuid := gen_random_uuid();
-    v_lv_ok uuid := gen_random_uuid(); v_ar_ok uuid := gen_random_uuid(); v_co_ok uuid := gen_random_uuid();
+    v_lv_ok uuid := gen_random_uuid(); v_lv_edge uuid := gen_random_uuid(); v_lv_beyond uuid := gen_random_uuid(); v_ar_ok uuid := gen_random_uuid(); v_co_ok uuid := gen_random_uuid();
     v_tpl record; v_cat uuid; v_asset uuid := gen_random_uuid(); v_asg uuid := gen_random_uuid();
     v_ev1 record; v_ev2 record;
 BEGIN
@@ -142,6 +142,8 @@ BEGIN
         INSERT INTO hr.employees (person_id, employee_number, hire_date) VALUES (v_p, 'OFF008-8-' || v_run, current_date - 400) RETURNING id INTO v_emp8;
         INSERT INTO core.people (organization_id, full_name, primary_email) VALUES (v_org, 'OFF008 E9', 'off008-e9-' || v_run || '@example.invalid') RETURNING id INTO v_p;
         INSERT INTO hr.employees (person_id, employee_number, hire_date) VALUES (v_p, 'OFF008-9-' || v_run, current_date - 400) RETURNING id INTO v_emp9;
+        INSERT INTO core.people (organization_id, full_name, primary_email) VALUES (v_org, 'OFF008 E10', 'off008-e10-' || v_run || '@example.invalid') RETURNING id INTO v_p;
+        INSERT INTO hr.employees (person_id, employee_number, hire_date) VALUES (v_p, 'OFF008-10-' || v_run, current_date - 400) RETURNING id INTO v_emp10;
 
         -- cases. LWD = today lets a case complete; LWD = today + 10 is "not yet"
         c_self   := pg_temp._mk('TERMINATION', v_emp1, v_run || '-self',   v_hr1, v_hr2, true, v_today);
@@ -153,6 +155,7 @@ BEGIN
         c_res    := pg_temp._mk('RESIGNATION', v_emp7, v_run || '-res',    v_hr1, v_hr2, true, v_today);
         c_atomic := pg_temp._mk('TERMINATION', v_emp8, v_run || '-atomic', v_hr1, v_hr2, true, v_today);
         c_appr   := pg_temp._mk('TERMINATION', v_emp9, v_run || '-appr',   v_hr1, v_hr2, true, v_today);
+        c_leave  := pg_temp._mk('TERMINATION', v_emp10, v_run || '-leave', v_hr1, v_hr2, true, v_today);
 
         PERFORM pg_temp._clear(c_self,   ARRAY['ASSETS','ACCESS','FINANCE','HANDOVER','HR'], ARRAY[]::text[], v_run || 'self',  v_clr, v_hr1);
         PERFORM pg_temp._clear(c_main,   ARRAY['ASSETS','ACCESS','HR'], ARRAY['FINANCE','HANDOVER'], v_run || 'main', v_clr, v_hr1);
@@ -162,6 +165,7 @@ BEGIN
         PERFORM pg_temp._clear(c_asset,  ARRAY['ASSETS','ACCESS','FINANCE','HANDOVER','HR'], ARRAY[]::text[], v_run || 'asset', v_clr, v_hr1);
         PERFORM pg_temp._clear(c_res,    ARRAY['ASSETS','ACCESS','FINANCE','HANDOVER','HR'], ARRAY[]::text[], v_run || 'res', v_clr, v_hr1);
         PERFORM pg_temp._clear(c_atomic, ARRAY['ASSETS','ACCESS','FINANCE','HANDOVER','HR'], ARRAY[]::text[], v_run || 'atomic', v_clr, v_hr1);
+        PERFORM pg_temp._clear(c_leave,  ARRAY['ASSETS','ACCESS','FINANCE','HANDOVER','HR'], ARRAY[]::text[], v_run || 'leave', v_clr, v_hr1);
 
         -- fixtures (as the manager so the audit triggers have an actor)
         PERFORM pg_temp._as(v_hr1);
@@ -169,7 +173,11 @@ BEGIN
         PERFORM pg_temp._mkctr(gen_random_uuid(), v_run || '-m1', v_emp2, 'ACTIVE', current_date - 100, NULL);
         PERFORM pg_temp._mkctr(gen_random_uuid(), v_run || '-m2', v_emp2, 'ACTIVE', current_date - 50, current_date + 365);
         INSERT INTO leave.leave_requests (id, employee_id, leave_type_id, start_date, end_date, total_days, request_status, submitted_at, hr_employee_id, created_at, updated_at, version)
-        VALUES (v_lv_ok, t_lv_emp, t_lv_type, date '2099-04-01', date '2099-04-02', 2, 'APPROVED', now(), v_emp2, now(), now(), 1);
+        VALUES (v_lv_ok, t_lv_emp, t_lv_type, date '2020-01-06', date '2020-01-07', 2, 'APPROVED', now(), v_emp2, now(), now(), 1);
+        INSERT INTO leave.leave_requests (id, employee_id, leave_type_id, start_date, end_date, total_days, request_status, submitted_at, hr_employee_id, created_at, updated_at, version)
+        VALUES (v_lv_edge, v_acc, t_lv_type, v_today - 2, v_today, 3, 'APPROVED', now(), v_emp2, now(), now(), 1);
+        INSERT INTO leave.leave_requests (id, employee_id, leave_type_id, start_date, end_date, total_days, request_status, submitted_at, hr_employee_id, created_at, updated_at, version)
+        VALUES (v_lv_beyond, v_oth, t_lv_type, date '2099-06-01', date '2099-06-02', 2, 'APPROVED', now(), v_emp10, now(), now(), 1);
         INSERT INTO assets.asset_requests (id, employee_id, asset_category_id, justification, request_status, submitted_at, hr_employee_id, created_at, updated_at, version)
         VALUES (v_ar_ok, t_a_emp, t_a_cat, 'off008 terminal', 'CANCELLED', now(), v_emp2, now(), now(), 1);
         INSERT INTO attendance.correction_requests (id, attendance_day_id, employee_id, requested_check_in, reason, request_status, submitted_at, hr_employee_id, created_at, updated_at, version)
@@ -192,7 +200,7 @@ BEGIN
         VALUES (v_asg, v_tpl.asset_request_id, v_asset, v_tpl.employee_id, v_emp6, v_tpl.assigned_by, now(), now(), 1);
 
         v_res := v_res || ARRAY['0d-fixture-states|' || CASE WHEN
-              (SELECT count(*) FROM offboarding.cases WHERE id IN (c_self, c_main, c_block, c_early, c_incomp, c_asset, c_res, c_atomic) AND status = 'IN_CLEARANCE') = 8
+              (SELECT count(*) FROM offboarding.cases WHERE id IN (c_self, c_main, c_block, c_early, c_incomp, c_asset, c_res, c_atomic, c_leave) AND status = 'IN_CLEARANCE') = 9
           AND (SELECT status::text FROM offboarding.cases WHERE id = c_appr) = 'APPROVED' THEN 'PASS' ELSE 'FAIL' END];
 
         -- 1. authentication, authorization, stage
@@ -230,6 +238,15 @@ BEGIN
                  ELSE 'FAIL: emp2=' || offboarding._completion_blockers(v_emp2)::text END];
 
         -- 3. atomicity: the second contract cannot be terminated, so NOTHING of the completion may remain
+        v_err := pg_temp._err(format('SELECT offboarding.complete_offboarding(%L::uuid, %L)', c_leave, v_k || 'd5'));
+        v_det := pg_temp._errd(format('SELECT offboarding.complete_offboarding(%L::uuid, %L)', c_leave, v_k || 'd5'));
+        v_res := v_res || ARRAY['2f-approved-leave-beyond-last-working-date-blocks-and-is-not-auto-cancelled|' ||
+            CASE WHEN v_err LIKE 'OFFBOARDING_OPEN_ITEMS_BLOCK: 1 %' AND jsonb_array_length(v_det::jsonb) = 1
+                  AND v_det::jsonb @> jsonb_build_array(jsonb_build_object('type', 'APPROVED_LEAVE_BEYOND_LAST_WORKING_DATE', 'record_id', v_lv_beyond, 'status', 'APPROVED'))
+                  AND (SELECT request_status::text FROM leave.leave_requests WHERE id = v_lv_beyond) = 'APPROVED' THEN 'PASS' ELSE 'FAIL: ' || coalesce(v_err, 'no error') || ' ' || coalesce(v_det, '') END];
+        v_res := v_res || ARRAY['2g-approved-leave-on-or-before-last-working-date-does-not-block|' ||
+            CASE WHEN offboarding._completion_blockers(v_emp2) = '[]'::jsonb AND (SELECT count(*) FROM leave.leave_requests WHERE hr_employee_id = v_emp2 AND request_status = 'APPROVED') = 2 THEN 'PASS' ELSE 'FAIL: ' || offboarding._completion_blockers(v_emp2)::text END];
+
         v_err := pg_temp._err(format('SELECT offboarding.complete_offboarding(%L::uuid, %L)', c_atomic, v_k || 'a1'));
         v_res := v_res || ARRAY['3a-failed-contract-termination-aborts-the-completion|' || pg_temp._expect(v_err, 'HR_TERMINATION_BEFORE_EFFECTIVE_FROM')];
         v_res := v_res || ARRAY['3b-nothing-persisted-contracts-employee-case-events-key|' ||
@@ -241,9 +258,9 @@ BEGIN
                   AND (SELECT count(*) FROM hr.employee_status_history WHERE employee_id = v_emp8 AND source = 'SANCTIONED_TERMINATION') = 0
                   AND NOT EXISTS (SELECT 1 FROM offboarding.request_idempotency WHERE idempotency_key = v_k || 'a1')
                  THEN 'PASS' ELSE 'FAIL' END];
-        SELECT count(*) INTO v_n FROM offboarding.outbox_events WHERE case_id IN (c_self, c_early, c_incomp, c_asset, c_block, c_appr, c_atomic);
+        SELECT count(*) INTO v_n FROM offboarding.outbox_events WHERE case_id IN (c_self, c_early, c_incomp, c_asset, c_block, c_appr, c_atomic, c_leave);
         SELECT count(*) INTO v_n2 FROM offboarding.request_idempotency WHERE idempotency_key LIKE v_k || 'u%' OR idempotency_key LIKE v_k || 'd%';
-        SELECT count(*) INTO v_n3 FROM hr.employees WHERE id IN (v_emp1, v_emp3, v_emp4, v_emp5, v_emp6, v_emp8, v_emp9) AND employment_status = 'TERMINATED';
+        SELECT count(*) INTO v_n3 FROM hr.employees WHERE id IN (v_emp1, v_emp3, v_emp4, v_emp5, v_emp6, v_emp8, v_emp9, v_emp10) AND employment_status = 'TERMINATED';
         v_res := v_res || ARRAY['3c-every-rejected-call-changed-nothing|' || CASE WHEN v_n = 0 AND v_n2 = 0 AND v_n3 = 0 THEN 'PASS' ELSE 'FAIL: events=' || v_n || ' keys=' || v_n2 || ' terminated=' || v_n3 END];
 
         -- 4. happy path: five domains (two waived), two ACTIVE contracts, terminal-state items present
